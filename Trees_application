@@ -1,0 +1,194 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct Book {
+    long long isbn; // 13-digit ISBN
+    char title[100];
+    char author[100];
+    struct Book *left, *right;
+} Book;
+
+// Create new book node
+// Time: O(1), Space: O(1)
+// Justification: Only malloc + field assignment, constant operations
+Book* newBook(long long isbn, char title[], char author[]) {
+    Book* node = (Book*)malloc(sizeof(Book));
+    if (!node) {
+        printf("Memory allocation failed\n");
+        exit(1);
+    }
+    node->isbn = isbn;
+    strcpy(node->title, title);
+    strcpy(node->author, author);
+    node->left = node->right = NULL;
+    return node;
+}
+
+// Insert book by ISBN
+// Time: O(h), h = height. Avg O(log n), Worst O(n)
+// Justification: BST property: go left if smaller, right if larger. One path root→leaf.
+// For n≤100 and depth≤20, worst case is 20 comparisons.
+Book* insertBook(Book* root, long long isbn, char title[], char author[]) {
+    if (root == NULL) return newBook(isbn, title, author);
+    if (isbn < root->isbn)
+        root->left = insertBook(root->left, isbn, title, author);
+    else if (isbn > root->isbn)
+        root->right = insertBook(root->right, isbn, title, author);
+    else
+        printf("ISBN %lld already exists. Cannot add duplicate.\n", isbn);
+    return root;
+}
+
+// Search book by ISBN
+// Time: O(h), Avg O(log n), Worst O(n)
+// Justification: Follow single path based on comparison until found or NULL
+Book* searchBook(Book* root, long long isbn) {
+    if (root == NULL || root->isbn == isbn) return root;
+    if (isbn < root->isbn) return searchBook(root->left, isbn);
+    return searchBook(root->right, isbn);
+}
+
+// Find minimum ISBN node in subtree
+// Time: O(h), Avg O(log n), Worst O(n)
+// Justification: Keep going left until left is NULL, at most h steps
+Book* minBook(Book* node) {
+    while (node && node->left!= NULL)
+        node = node->left;
+    return node;
+}
+
+// Delete book by ISBN
+// Time: O(h), Avg O(log n), Worst O(n)
+// Justification: Search O(h) + if 2 children, find successor O(h) + delete successor O(h)
+Book* deleteBook(Book* root, long long isbn) {
+    if (root == NULL) {
+        printf("ISBN %lld not found in catalog.\n", isbn);
+        return root;
+    }
+    if (isbn < root->isbn)
+        root->left = deleteBook(root->left, isbn);
+    else if (isbn > root->isbn)
+        root->right = deleteBook(root->right, isbn);
+    else {
+        if (root->left == NULL) {
+            Book* temp = root->right;
+            printf("Deleted: %lld | %s\n", root->isbn, root->title);
+            free(root);
+            return temp;
+        } else if (root->right == NULL) {
+            Book* temp = root->left;
+            printf("Deleted: %lld | %s\n", root->isbn, root->title);
+            free(root);
+            return temp;
+        }
+        Book* temp = minBook(root->right);
+        root->isbn = temp->isbn;
+        strcpy(root->title, temp->title);
+        strcpy(root->author, temp->author);
+        root->right = deleteBook(root->right, temp->isbn);
+    }
+    return root;
+}
+
+// Inorder: prints books sorted by ISBN
+// Time: O(n), Space: O(h) recursion stack
+// Justification: Must visit every node once to list all books in order
+void displayCatalog(Book* root) {
+    if (root!= NULL) {
+        displayCatalog(root->left);
+        printf("%lld | %-30s | %s\n", root->isbn, root->title, root->author);
+        displayCatalog(root->right);
+    }
+}
+
+// Range search: books between low and high ISBN
+// Time: O(h + k) where k = nodes in range, Worst O(n)
+// Justification: Prune subtrees outside range, only traverse relevant nodes + results
+void booksInRange(Book* root, long long low, long long high) {
+    if (root == NULL) return;
+    if (low < root->isbn) booksInRange(root->left, low, high);
+    if (low <= root->isbn && root->isbn <= high)
+        printf("%lld | %-30s | %s\n", root->isbn, root->title, root->author);
+    if (high > root->isbn) booksInRange(root->right, low, high);
+}
+
+// Count total books
+// Time: O(n), Space: O(h)
+// Justification: Must visit all nodes
+int countBooks(Book* root) {
+    if (root == NULL) return 0;
+    return 1 + countBooks(root->left) + countBooks(root->right);
+}
+
+// Free memory
+// Time: O(n), Space: O(h)
+void freeCatalog(Book* root) {
+    if (root) {
+        freeCatalog(root->left);
+        freeCatalog(root->right);
+        free(root);
+    }
+}
+
+void menu() {
+    printf("\n===== Library Catalog System =====\n");
+    printf("1. Add New Book\n");
+    printf("2. Search Book by ISBN\n");
+    printf("3. Display (Sorted)\n");
+    printf("4. Exit\n");
+    printf("Choice: ");
+}
+
+int main() {
+    Book* catalog = NULL;
+    int choice;
+    long long isbn;
+    char title[100], author[100];
+
+    while (1) {
+        menu();
+        if (scanf("%d", &choice)!= 1) break;
+
+        switch (choice) {
+            case 1:
+                printf("Enter ISBN: ");
+                scanf("%lld", &isbn);
+                printf("Enter Title: ");
+                scanf(" %[^\n]", title);
+                printf("Enter Author: ");
+                scanf(" %[^\n]", author);
+                catalog = insertBook(catalog, isbn, title, author);
+                printf("Done. Insert complexity: O(h)\n");
+                break;
+            case 2:
+                printf("Enter ISBN to search: ");
+                scanf("%lld", &isbn);
+                Book* found = searchBook(catalog, isbn);
+                if (found)
+                    printf("Found: %lld | %s | %s\n", found->isbn, found->title, found->author);
+                else
+                    printf("Not found.\n");
+                printf("Search complexity: O(h)\n");
+                break;
+
+            case 3:
+                printf("\nISBN | Title | Author\n");
+                printf("---------------------------------------------------------------\n");
+                if (catalog == NULL) printf("Catalog is empty\n");
+                else displayCatalog(catalog);
+                printf("Traversal complexity: O(n)\n");
+                break;
+
+
+
+
+            case 4:exit(0);
+
+            default:
+                printf("Invalid choice\n");
+        }
+    }
+    freeCatalog(catalog);
+    return 0;
+}
